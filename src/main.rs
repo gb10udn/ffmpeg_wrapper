@@ -4,27 +4,27 @@ use std::process::{Command, Stdio};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let choices = vec![
-        "📷 Create gif",
-        "🔇 Remove sound",
+        "gif",
+        "mute",
     ];
     let selection = Select::new().items(&choices).interact()?;
     match selection {
         0_usize => create_gif(),
         1_usize => remove_sound(),
-        _ => Err("❌ Incorrect selection ...".into()),
+        _ => Err("Error: Incorrect selection ...".into()),
     }
 }
 
 fn obtain_file_path() -> Result<String, Box<dyn std::error::Error>> {
     let input = Input::<String>::new()
-        .with_prompt("📄 input movie file path")
+        .with_prompt("Input movie file path")
         .interact()?;
     let input = _remove_head_and_tail_double_quotation(&input);
     let path = Path::new(&input);
     if path.exists() & path.is_file() {
         Ok(input)
     } else {
-        Err(format!("❌ File not exist -> {:?}", path).into())
+        Err(format!("Error: File not exist -> {:?}", path).into())
     }
 }
 
@@ -41,7 +41,7 @@ fn _remove_head_and_tail_double_quotation(arg: &String) -> String {
 
 fn obtain_width() -> Result<usize, Box<dyn std::error::Error>> {
     let width = Input::<String>::new()
-        .with_prompt("↔ Input gif width (default : 1280)")
+        .with_prompt("Input gif width (default : 1280)")
         .interact()?;
     let width: usize = width.parse().unwrap_or_else(|_| {
         const DEFAULT_VALUE: usize = 1280;
