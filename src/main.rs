@@ -6,11 +6,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let choices = vec![
         "gif",
         "mute",
+        "compress",
     ];
     let selection = Select::new().items(&choices).interact()?;
     match selection {
         0_usize => create_gif(),
         1_usize => remove_sound(),
+        2_usize => compress(),
         _ => Err("Error: Incorrect selection ...".into()),
     }
 }
@@ -72,12 +74,31 @@ fn create_gif() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(Stdio::piped())
         .output()
         .expect("\n\nFailed to execute command\n\n");
-
     Ok(())
 }
 
 fn remove_sound() -> Result<(), Box<dyn std::error::Error>> {
-    let movie_path = obtain_file_path()?;
-    // TODO: 240411 音声除去機能を追加する
+    let src = obtain_file_path()?;
+    let src = Path::new(&src);
+    let file_stem = src.file_stem().unwrap().to_string_lossy().to_string();
+    let dst = src.with_file_name(format!("{}_mute.mp4", file_stem));
+    Command::new("ffmpeg")
+        .args([
+            "-i",
+           src.to_str().unwrap(),
+           "-vcodec",
+           "copy",
+           "-an",
+           dst.to_str().unwrap(),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("\n\nFailed to execute command\n\n");
+    Ok(())
+}
+
+fn compress() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: 240411 動画ファイルを圧縮する機能を付ける。
     Ok(())
 }
