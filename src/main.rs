@@ -1,8 +1,15 @@
 use dialoguer::{Select, Input};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::fs;
+use reqwest::blocking::Client;
+use zip::read::ZipArchive;
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const FFMPEG_PATH: &str = "./misc/ffmpeg.exe";
+    download_ffmpeg(FFMPEG_PATH).expect("Fail to setup ffmpeg");
+    
     let choices = vec![
         "gif",
         "mute",
@@ -10,11 +17,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     let selection = Select::new().items(&choices).interact()?;
     match selection {
-        0_usize => create_gif(),
-        1_usize => remove_sound(),
+        0_usize => create_gif(FFMPEG_PATH),
+        1_usize => remove_sound(FFMPEG_PATH),
         2_usize => compress(),
         _ => Err("Error: Incorrect selection ...".into()),
     }
+}
+
+fn download_ffmpeg(dst: &str) -> Result<(), Box<dyn std::error::Error>> {
+    const FFMPEG_URL: &str = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+    if !Path::new(dst).exists() {
+        println!("Start to download ffmpeg ...");
+        let temp_dir = Path::new("./temp_ffmpeg");
+        fs::create_dir_all(temp_dir)?;
+
+        let client = Client::new();
+        let mut response = client.get(FFMPEG_URL).send()?;
+        if response.status().is_success() {
+            let mut dest = fs::File::create(temp_dir.join("ffmpeg.zip"))?;
+            response.copy_to(&mut dest)?;
+
+            let zip_path = temp_dir.join("ffmpeg.zip");
+            let target_dir = temp_dir.join("ffmpeg");
+            let mut archive = ZipArchive::new(fs::File::open(zip_path)?)?;
+            archive.extract(&target_dir)?;
+
+            let src_path = target_dir.join("ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe");
+
+            if let Some(dst_dir) = Path::new(dst).parent() {
+                fs::create_dir_all(dst_dir).unwrap();
+            }
+
+            fs::copy(src_path, dst)?;
+            fs::remove_dir_all(temp_dir)?;
+        } else {
+            println!("Failed to download FFmpeg.");
+        }
+    }
+    Ok(())
 }
 
 fn obtain_file_path() -> Result<String, Box<dyn std::error::Error>> {
@@ -52,7 +92,7 @@ fn obtain_width() -> Result<usize, Box<dyn std::error::Error>> {
     Ok(width)
 }
 
-fn create_gif() -> Result<(), Box<dyn std::error::Error>> {
+fn create_gif(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let src = obtain_file_path()?;
     let src = Path::new(&src);
     let file_stem = src.file_stem().unwrap().to_string_lossy().to_string();
@@ -60,7 +100,7 @@ fn create_gif() -> Result<(), Box<dyn std::error::Error>> {
     let dst = src.with_file_name(format!("{}_{}.gif", file_stem, width));
     println!("{:?}", dst);
 
-    Command::new("ffmpeg")  // TODO: 240411 ffmpeg にパスが通ってない場合もあるので、.ps1 を実行するようにする。
+    Command::new(ffmpeg_path)
         .args([
             "-i",
             src.to_str().unwrap(),
@@ -77,12 +117,12 @@ fn create_gif() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn remove_sound() -> Result<(), Box<dyn std::error::Error>> {
+fn remove_sound(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let src = obtain_file_path()?;
     let src = Path::new(&src);
     let file_stem = src.file_stem().unwrap().to_string_lossy().to_string();
     let dst = src.with_file_name(format!("{}_mute.mp4", file_stem));
-    Command::new("ffmpeg")
+    Command::new(ffmpeg_path)
         .args([
             "-i",
            src.to_str().unwrap(),
