@@ -20,7 +20,7 @@ fn main() {
     match selection {
         0_usize => create_gif(FFMPEG_PATH).unwrap(),
         1_usize => remove_sound(FFMPEG_PATH).unwrap(),
-        2_usize => compress().unwrap(),
+        2_usize => compress(FFMPEG_PATH).unwrap(),
         _ => println!("Error: Incorrect selection ..."),
     }
     stop();
@@ -103,23 +103,27 @@ fn obtain_width() -> Result<usize, Box<dyn std::error::Error>> {
     Ok(width)
 }
 
-fn create_gif(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let src = obtain_file_path()?;
+fn obtain_dst_path(src: &String, suffix: &str, extension: &str) -> String {
     let src = Path::new(&src);
     let file_stem = src.file_stem().unwrap().to_string_lossy().to_string();
+    let dst = src.with_file_name(format!("{}_{}.{}", file_stem, suffix, extension));  // TODO: 240414 既に存在する場合に panic! してもいいかも？
+    dst.to_string_lossy().to_string()
+}
+
+fn create_gif(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let src = obtain_file_path()?;
     let width = obtain_width().unwrap();
-    let dst = src.with_file_name(format!("{}_{}.gif", file_stem, width));
-    println!("{:?}", dst);
+    let dst = obtain_dst_path(&src, &width.to_string(), "gif");
 
     Command::new(ffmpeg_path)
         .args([
             "-i",
-            src.to_str().unwrap(),
+            &src,
             "-vf",
             &format!("scale={}:-1", width),
             "-r",
             "10",
-            dst.to_str().unwrap(),
+            &dst,
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -130,17 +134,15 @@ fn create_gif(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
 
 fn remove_sound(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let src = obtain_file_path()?;
-    let src = Path::new(&src);
-    let file_stem = src.file_stem().unwrap().to_string_lossy().to_string();
-    let dst = src.with_file_name(format!("{}_mute.mp4", file_stem));
+    let dst = obtain_dst_path(&src, "mute", "mp4");
     Command::new(ffmpeg_path)
         .args([
             "-i",
-           src.to_str().unwrap(),
+           &src,
            "-vcodec",
            "copy",
            "-an",
-           dst.to_str().unwrap(),
+           &dst,
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -149,7 +151,32 @@ fn remove_sound(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn compress() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: 240411 動画ファイルを圧縮する機能を付ける。
+fn compress(ffmpeg_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let src = obtain_file_path().unwrap();
+    let compress_param = obtain_compress_parameter().unwrap();
+    let dst = obtain_dst_path(&src, &format!("compress={}", compress_param), "mp4");
+    Command::new(ffmpeg_path)
+        .args([
+            "-i",
+           &src,
+           "-crf",
+           &compress_param.to_string(),
+           &dst,
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("\n\nFailed to execute command\n\n");
     Ok(())
+}
+
+fn obtain_compress_parameter() -> Result<usize, Box<dyn std::error::Error>> {
+    let width = Input::<String>::new()
+        .with_prompt("Input compress parameter (Ex. 30)")
+        .interact()?;
+    let width: usize = width.parse().unwrap_or_else(|_| {
+        const DEFAULT_VALUE: usize = 30;
+        DEFAULT_VALUE
+    });
+    Ok(width)
 }
