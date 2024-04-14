@@ -2,11 +2,12 @@ use dialoguer::{Select, Input};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::fs;
+use std::io;
 use reqwest::blocking::Client;
 use zip::read::ZipArchive;
 
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     const FFMPEG_PATH: &str = "./misc/ffmpeg.exe";
     download_ffmpeg(FFMPEG_PATH).expect("Fail to setup ffmpeg");
     
@@ -15,12 +16,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "mute",
         "compress",
     ];
-    let selection = Select::new().items(&choices).interact()?;
+    let selection = Select::new().items(&choices).interact().unwrap();
     match selection {
-        0_usize => create_gif(FFMPEG_PATH),
-        1_usize => remove_sound(FFMPEG_PATH),
-        2_usize => compress(),
-        _ => Err("Error: Incorrect selection ...".into()),
+        0_usize => create_gif(FFMPEG_PATH).unwrap(),
+        1_usize => remove_sound(FFMPEG_PATH).unwrap(),
+        2_usize => compress().unwrap(),
+        _ => println!("Error: Incorrect selection ..."),
+    }
+    stop();
+}
+
+fn stop() {
+    println!("");
+    println!("finished !!!");
+    loop {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("");
     }
 }
 
@@ -83,7 +94,7 @@ fn _remove_head_and_tail_double_quotation(arg: &String) -> String {
 
 fn obtain_width() -> Result<usize, Box<dyn std::error::Error>> {
     let width = Input::<String>::new()
-        .with_prompt("Input gif width (default : 1280)")
+        .with_prompt("Input gif width (Ex. 1280)")
         .interact()?;
     let width: usize = width.parse().unwrap_or_else(|_| {
         const DEFAULT_VALUE: usize = 1280;
